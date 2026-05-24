@@ -1,0 +1,49 @@
+{
+  "appId": "com.aifilenamer.app",
+  "productName": "AIFileNamer",
+  "copyright": "Copyright © 2026 AAMServices",
+  "directories": {
+    "output": "release-store-exe",
+    "buildResources": "public"
+  },
+  "files": [
+    "dist/**/*",
+    "main.cjs",
+    "preload.cjs",
+    "src/backend/**/*",
+    "public/**/*",
+    "package.json",
+    "node_modules/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "public",
+      "to": "public"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "public/favicon.ico",
+    "forceCodeSigning": false,
+    "cscLink": null,
+    "cscKeyPassword": null
+  },
+  "nsis": {
+    "license": "public/license.txt",
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "AIFileNamer",
+    "installerIcon": "public/favicon.ico",
+    "uninstallerIcon": "public/favicon.ico"
+  }
+}

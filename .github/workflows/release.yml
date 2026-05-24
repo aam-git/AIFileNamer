@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v1.0.0'
+        required: true
+        default: 'v1.0.0'
+        type: string
+      prerelease:
+        description: 'Mark this release as a prerelease'
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            build_args: --linux
+            artifact_name: release-linux
+            artifact_paths: |
+              release/*.AppImage
+              release/*.deb
+              release/latest-linux.yml
+          - name: macOS
+            os: macos-latest
+            build_args: --mac
+            artifact_name: release-macos
+            artifact_paths: |
+              release/*.zip
+              release/*.zip.blockmap
+              release/*.dmg
+              release/*.dmg.blockmap
+              release/latest-mac.yml
+          - name: Windows
+            os: windows-latest
+            build_args: --win
+            artifact_name: release-windows
+            artifact_paths: |
+              release/*.exe
+              release/*.exe.blockmap
+              release/latest.yml
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build App
+        run: npm run build
+
+      - name: Package App
+        run: npx electron-builder --config electron-builder.json ${{ matrix.build_args }} --publish never
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Manual Release Tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags origin
+          if git rev-parse "refs/tags/${{ inputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag ${{ inputs.tag }} already exists."
+          else
+            git tag "${{ inputs.tag }}" "${{ github.sha }}"
+            git push origin "${{ inputs.tag }}"
+          fi
+
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          overwrite_files: true
+          files: release-artifacts/*
