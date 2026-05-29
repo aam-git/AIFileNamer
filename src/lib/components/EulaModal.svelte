@@ -1,5 +1,5 @@
 <script lang="ts">
-  import licenseTextRaw from '../../../public/license.txt?raw';
+  import licenseTextRaw from '../../license.txt?raw';
 
   let { onAccept, onDecline } = $props<{ onAccept: () => void, onDecline: () => void }>();
 

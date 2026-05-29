@@ -1,6 +1,11 @@
 {
   "appId": "com.aifilenamer.app",
   "productName": "AIFileNamer",
+  "publish": {
+    "provider": "github",
+    "owner": "aam-git",
+    "repo": "AIFileNamer"
+  },
   "copyright": "Copyright © 2026 AAMServices",
   "directories": {
     "output": "release",

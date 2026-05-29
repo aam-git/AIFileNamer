@@ -2,7 +2,7 @@
   "name": "aifilenamer",
   "productName": "AIFileNamer",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "main.cjs",
   "author": {
@@ -20,6 +20,11 @@
     "dist:mac": "vite build && electron-builder --mac --config electron-builder.json",
     "dist:linux": "vite build && electron-builder --linux --config electron-builder.json",
     "dist:all": "vite build && electron-builder --win --mac --linux --config electron-builder.json",
+    "release": "vite build && electron-builder --publish always --config electron-builder.json",
+    "release:win": "vite build && electron-builder --win --publish always --config electron-builder.json",
+    "release:mac": "vite build && electron-builder --mac --publish always --config electron-builder.json",
+    "release:linux": "vite build && electron-builder --linux --publish always --config electron-builder.json",
+    "release:all": "vite build && electron-builder --win --mac --linux --publish always --config electron-builder.json",
     "dist:store-exe": "vite build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false CSC_LINK= CSC_KEY_PASSWORD= WIN_CSC_LINK= WIN_CSC_KEY_PASSWORD= electron-builder --win --config electron-builder.store-exe.json"
   },
   "devDependencies": {
@@ -41,6 +46,7 @@
   "dependencies": {
     "ag-psd": "^30.1.1",
     "dexie": "^4.4.2",
+    "electron-updater": "^6.8.3",
     "exifr": "^7.1.3",
     "heic-decode": "^2.1.0",
     "jimp": "^1.6.1",

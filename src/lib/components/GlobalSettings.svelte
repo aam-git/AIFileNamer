@@ -4,6 +4,7 @@
   let version = $state('');
   let osInfo = $state('');
   let startMinimized = $state(false);
+  let autoUpdateEnabled = $state(true);
   let isLoaded = $state(false);
   let saveMsg = $state('');
 
@@ -14,7 +15,8 @@
       osInfo = sysInfo.os;
 
       const settings = await window.electronAPI.getGlobalSettings();
-      startMinimized = settings.startMinimized;
+      startMinimized = settings.startMinimized ?? false;
+      autoUpdateEnabled = settings.autoUpdateEnabled ?? true;
       
       isLoaded = true;
     }
@@ -33,9 +35,23 @@
       }
     }
   }
+
+  async function toggleAutoUpdate() {
+    autoUpdateEnabled = !autoUpdateEnabled;
+    if (window.electronAPI) {
+      const result = await window.electronAPI.saveGlobalSettings({ autoUpdateEnabled });
+      if (result.success) {
+        saveMsg = 'Settings saved. Requires restart to take effect.';
+        setTimeout(() => saveMsg = '', 3000);
+      } else {
+        saveMsg = 'Failed to save settings: ' + result.error;
+        setTimeout(() => saveMsg = '', 3000);
+      }
+    }
+  }
 </script>
 
-<div class="max-w-3xl mx-auto h-full overflow-y-auto pb-12 animate-fade-in">
+<div class="max-w-3xl mx-auto pb-12 animate-fade-in">
   <div class="mb-10">
     <h1 class="text-3xl font-bold text-white mb-2">Global Settings</h1>
     <p class="text-slate-400 text-lg">
@@ -81,6 +97,32 @@
         {#if saveMsg}
           <p class="text-sm text-emerald-400 mt-4 text-right animate-fade-in-up">{saveMsg}</p>
         {/if}
+      </div>
+
+      <!-- Update Preferences -->
+      <div class="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
+        <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+          <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Updates
+        </h3>
+
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-white font-medium text-lg">Automatically Check for Updates</h4>
+            <p class="text-slate-400 text-sm mt-1">Download and prepare updates in the background.</p>
+          </div>
+          <button 
+            class="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 {autoUpdateEnabled ? 'bg-indigo-500' : 'bg-slate-700'}"
+            onclick={toggleAutoUpdate}
+          >
+            <span class="sr-only">Toggle Auto Update</span>
+            <span 
+              class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform {autoUpdateEnabled ? 'translate-x-8' : 'translate-x-1'}"
+            ></span>
+          </button>
+        </div>
       </div>
 
       <!-- System Information -->

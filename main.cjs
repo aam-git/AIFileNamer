@@ -4,6 +4,7 @@ global.Path2D = class Path2D { };
 
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -138,11 +139,23 @@ function createTray() {
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  const settings = getGlobalSettings();
+  if (settings.autoUpdateEnabled !== false) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
     else mainWindow.show();
   });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  if (mainWindow) mainWindow.webContents.send('update-ready');
+});
+
+ipcMain.on('install-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 app.on('window-all-closed', function () {

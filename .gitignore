@@ -36,3 +36,4 @@ release-*
 .svelte-kit/
 
 .history
+PUBLISHING_GUIDE.md

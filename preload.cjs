@@ -18,4 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   getGlobalSettings: () => ipcRenderer.invoke('get-global-settings'),
   saveGlobalSettings: (settings) => ipcRenderer.invoke('save-global-settings', settings),
+  
+  // Updater API
+  onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
+  installUpdate: () => ipcRenderer.send('install-update')
 });
