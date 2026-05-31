@@ -1,10 +1,11 @@
 import type { ScannerConfig, ScannerRuntimeData } from './stores';
+import {
+  DEFAULT_CUSTOM_PROMPT,
+  DEFAULT_FOLDER_PROMPT,
+  defaultApiUrlForProvider,
+} from './aiDefaults';
 
-export const DEFAULT_CUSTOM_PROMPT =
-  'Based on the following file content, suggest a concise, descriptive filename (without extension, using lowercase and underscores). Only output the filename, nothing else.';
-
-export const DEFAULT_FOLDER_PROMPT =
-  "Based on the following file content, suggest a concise, descriptive relative folder path and filename (without extension, using lowercase and underscores) to categorize the file. VERY IMPORTANT: Separate folders with a forward slash (/) and MUST start with '{baseFolder}/'. e.g., '{baseFolder}/category/sub_category/descriptive_name'. Only output the relative path and filename, nothing else.";
+export { DEFAULT_CUSTOM_PROMPT, DEFAULT_FOLDER_PROMPT, defaultApiUrlForProvider };
 
 
 

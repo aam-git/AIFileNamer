@@ -113,7 +113,6 @@
   // ── AI Settings Change Watcher ─────────────────────────────────────────────
   let settingsKey = $derived(JSON.stringify({
     provider: scanner?.provider,
-    apiKey: scanner?.apiKey,
     apiUrl: scanner?.apiUrl,
     model: scanner?.model,
     suggestFolders: scanner?.suggestFolders,
@@ -185,10 +184,10 @@
 
   // ── File Validation ─────────────────────────────────────────────────────────
   async function validateActiveFiles(fileList: any[]) {
-    if (!window.electronAPI || isScanning || isProcessing) return;
+    if (!window.electronAPI || isScanning || isProcessing || !scanner?.selectedDir) return;
     const paths = fileList.map(f => f.path);
     try {
-      const existing = await window.electronAPI.checkFilesExist(paths);
+      const existing = await window.electronAPI.checkFilesExist(paths, scanner.selectedDir);
       const existingSet = new Set(existing);
       let changed = false;
       const current = $scannerFilesStore[scannerId] ?? [];
@@ -419,7 +418,7 @@
           selectedExtensions: scanner.selectedExtensions,
         };
 
-        const res = await window.electronAPI.processFile(file, providerConfig, appSettings);
+        const res = await window.electronAPI.processFile(file, providerConfig, appSettings, scanner.selectedDir);
 
         if (res.aiLog) {
           const rt = $scannersStore.runtimeData[scannerId] ?? createEmptyRuntimeData();
@@ -480,7 +479,7 @@
     try {
       let successCount = 0;
       for (const file of filesToRename) {
-        const results = await window.electronAPI.renameFiles([file]);
+        const results = await window.electronAPI.renameFiles([file], scanner!.selectedDir);
         const res = results[0];
         if (!res) continue;
 
@@ -498,7 +497,6 @@
               processedHistory: {
                 ...rt.processedHistory,
                 [file.path]: { newName: res.proposedName, timestamp: Date.now() },
-                [res.path]: { newName: res.proposedName, timestamp: Date.now(), isResult: true }
               },
             });
           }

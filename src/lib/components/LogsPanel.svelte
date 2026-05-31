@@ -4,6 +4,7 @@
 
   let { scannerId }: { scannerId: string } = $props();
 
+  let scanner = $derived($scannersStore.configs.find(c => c.id === scannerId));
   let runtime = $derived($scannersStore.runtimeData[scannerId] ?? createEmptyRuntimeData());
   let processedHistory = $derived(runtime.processedHistory);
   let aiLogs = $derived(runtime.aiLogs);
@@ -22,7 +23,12 @@
     return val.timestamp || 0;
   }
 
+  function isResultEntry(val: unknown): boolean {
+    return typeof val === 'object' && val !== null && 'isResult' in val && !!(val as { isResult?: boolean }).isResult;
+  }
+
   let historyEntries = $derived(Object.entries(processedHistory)
+    .filter(([, val]) => !isResultEntry(val))
     .map(([originalPath, val]) => ({
       originalPath,
       newName: getEntryName(val),
@@ -85,6 +91,12 @@
   }
 
   async function undoSelected() {
+    const selectedDir = scanner?.selectedDir;
+    if (!selectedDir) {
+      showToast('Scanner directory is not configured');
+      return;
+    }
+
     const toUndo = filteredEntries
       .filter(e => e.selected)
       .map(e => ({ originalPath: e.originalPath, proposedName: e.newName }));
@@ -93,7 +105,7 @@
 
     isUndoing = true;
     try {
-      const results = await window.electronAPI.undoRenames(toUndo);
+      const results = await window.electronAPI.undoRenames(toUndo, selectedDir);
       let successCount = 0;
       const rt = $scannersStore.runtimeData[scannerId] ?? createEmptyRuntimeData();
       const newHistory = { ...rt.processedHistory };

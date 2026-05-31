@@ -74,9 +74,6 @@ export const scannerLiveStatusStore = writable<Record<string, ScannerLiveStatus>
 // Initialize stores from Dexie
 async function initDbStores() {
   try {
-    // Wipe all localStorage (no backwards compatibility, start afresh)
-    localStorage.clear();
-
     // Load from Isolated Dexie Tables
     const configs = await db.configs.toArray();
     const runtimeDataArray = await db.runtimeData.toArray();

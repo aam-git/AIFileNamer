@@ -1,6 +1,7 @@
 <script lang="ts">
   import { scannersStore, scannerLiveStatusStore, type ScannerConfig } from '../stores';
   import { copyConfigFrom, DEFAULT_CUSTOM_PROMPT, DEFAULT_FOLDER_PROMPT } from '../scannerUtils';
+  import { defaultApiUrlForProvider, isDefaultLocalUrl } from '../aiDefaults';
 
   let { scannerId }: { scannerId: string } = $props();
 
@@ -187,13 +188,8 @@
               const newSettings = currentSettings[newProvider] || {};
               let newApiUrl = newSettings.apiUrl;
 
-              if (!newApiUrl || newApiUrl === 'http://localhost:1234/v1' || newApiUrl === 'http://localhost:11434' || newApiUrl === '' || newApiUrl === 'http://localhost:8080/v1' || newApiUrl === 'http://localhost:1337/v1' || newApiUrl === 'http://localhost:4891/v1') {
-                if (newProvider === 'ollama') newApiUrl = 'http://localhost:11434';
-                else if (newProvider === 'lmstudio') newApiUrl = 'http://localhost:1234/v1';
-                else if (newProvider === 'llamacpp') newApiUrl = 'http://localhost:8080/v1';
-                else if (newProvider === 'jan') newApiUrl = 'http://localhost:1337/v1';
-                else if (newProvider === 'gpt4all') newApiUrl = 'http://localhost:4891/v1';
-                else newApiUrl = ''; // Other providers don't use the URL field
+              if (!newApiUrl || isDefaultLocalUrl(newApiUrl)) {
+                newApiUrl = defaultApiUrlForProvider(newProvider);
               }
               updateConfig({ 
                 provider: newProvider, 

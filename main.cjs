@@ -188,6 +188,7 @@ ipcMain.handle('save-global-settings', (event, newSettings) => {
 const { scanDirectory } = require('./src/backend/scanner.cjs');
 const { extractContent } = require('./src/backend/extractor.cjs');
 const { generateFilename, fetchModels } = require('./src/backend/ai.cjs');
+const { resolveWithinBase, assertPathWithinBase } = require('./src/backend/pathUtils.cjs');
 
 // IPC Handlers
 ipcMain.on('window-minimize', () => {
@@ -209,7 +210,14 @@ ipcMain.on('window-close', () => {
 });
 
 ipcMain.on('open-external', (event, url) => {
-  shell.openExternal(url);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      shell.openExternal(parsed.href);
+    }
+  } catch (e) {
+    // ignore invalid URLs
+  }
 });
 
 ipcMain.handle('fetch-models', async (event, providerConfig) => {
@@ -227,8 +235,11 @@ ipcMain.handle('scan-directory', async (event, dirPath, limit, extensions, nameF
   return await scanDirectory(dirPath, limit, extensions, nameFilter, nameFilterFlags);
 });
 
-ipcMain.handle('process-file', async (event, file, providerConfig, appSettings) => {
+ipcMain.handle('process-file', async (event, file, providerConfig, appSettings, baseDir) => {
   try {
+    if (baseDir) {
+      assertPathWithinBase(file.path, baseDir);
+    }
     const content = await extractContent(file.path, file.extension, providerConfig.provider);
     if (!content) throw new Error('Could not extract content');
 
@@ -239,20 +250,21 @@ ipcMain.handle('process-file', async (event, file, providerConfig, appSettings) 
   }
 });
 
-ipcMain.handle('rename-files', async (event, filesToRename) => {
+ipcMain.handle('rename-files', async (event, filesToRename, baseDir) => {
   const fs = require('fs/promises');
-  const path = require('path');
   const results = [];
 
   for (const file of filesToRename) {
     try {
-      const dirPath = path.dirname(file.path);
-      let newPath = path.join(dirPath, file.proposedName);
+      if (!baseDir) throw new Error('Scanner directory is required');
+      assertPathWithinBase(file.path, baseDir);
+
+      const dirPath = path.resolve(baseDir);
+      let newPath = resolveWithinBase(dirPath, file.proposedName);
       const newDirPath = path.dirname(newPath);
       let finalProposedName = file.proposedName;
 
-      // If the file is already named exactly what the AI proposed, skip rename
-      if (newPath === file.path) {
+      if (newPath === path.resolve(file.path)) {
         results.push({ ...file, status: 'renamed', path: newPath, proposedName: finalProposedName });
         continue;
       }
@@ -262,16 +274,17 @@ ipcMain.handle('rename-files', async (event, filesToRename) => {
 
         let foundEmptySlot = false;
         const ext = path.extname(file.proposedName);
+        const dirPart = path.dirname(file.proposedName);
         const base = path.basename(file.proposedName, ext);
 
         for (let i = 1; i <= 50; i++) {
-          const testName = `${base} (${i})${ext}`;
-          const testPath = path.join(dirPath, testName);
+          const testRelative = dirPart === '.' ? `${base} (${i})${ext}` : path.join(dirPart, `${base} (${i})${ext}`);
+          const testPath = resolveWithinBase(dirPath, testRelative);
           try {
             await fs.access(testPath);
           } catch (e) {
             newPath = testPath;
-            finalProposedName = testName;
+            finalProposedName = testRelative;
             foundEmptySlot = true;
             break;
           }
@@ -285,9 +298,7 @@ ipcMain.handle('rename-files', async (event, filesToRename) => {
         // Safe to rename
       }
 
-      // Ensure target directory exists just in case
       await fs.mkdir(newDirPath, { recursive: true });
-
       await fs.rename(file.path, newPath);
       results.push({ ...file, status: 'renamed', path: newPath, proposedName: finalProposedName });
     } catch (error) {
@@ -297,19 +308,19 @@ ipcMain.handle('rename-files', async (event, filesToRename) => {
   return results;
 });
 
-ipcMain.handle('undo-renames', async (event, filesToUndo) => {
+ipcMain.handle('undo-renames', async (event, filesToUndo, baseDir) => {
   const fs = require('fs/promises');
-  const path = require('path');
   const results = [];
 
   for (const file of filesToUndo) {
     try {
-      const originalDirPath = path.dirname(file.originalPath);
-      const currentPath = path.join(originalDirPath, file.proposedName);
+      if (!baseDir) throw new Error('Scanner directory is required');
+      assertPathWithinBase(file.originalPath, baseDir);
 
-      // Ensure target directory exists just in case
-      await fs.mkdir(originalDirPath, { recursive: true });
+      const dirPath = path.resolve(baseDir);
+      const currentPath = resolveWithinBase(dirPath, file.proposedName);
 
+      await fs.mkdir(path.dirname(file.originalPath), { recursive: true });
       await fs.rename(currentPath, file.originalPath);
       results.push({ ...file, status: 'undone' });
     } catch (error) {
@@ -319,16 +330,19 @@ ipcMain.handle('undo-renames', async (event, filesToUndo) => {
   return results;
 });
 
-ipcMain.handle('check-files-exist', async (event, paths) => {
+ipcMain.handle('check-files-exist', async (event, paths, baseDir) => {
   const fs = require('fs/promises');
   const existingPaths = [];
 
   for (const p of paths) {
     try {
+      if (baseDir) {
+        assertPathWithinBase(p, baseDir);
+      }
       await fs.access(p);
       existingPaths.push(p);
     } catch (e) {
-      // File doesn't exist
+      // File doesn't exist or path rejected
     }
   }
   return existingPaths;

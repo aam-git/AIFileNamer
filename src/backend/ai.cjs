@@ -1,3 +1,11 @@
+const {
+  DEFAULT_CUSTOM_PROMPT,
+  DEFAULT_FOLDER_PROMPT,
+  LOCAL_OPENAI_COMPAT,
+  defaultApiUrlForProvider,
+  resolveLocalBaseUrl,
+} = require('./aiDefaults.cjs');
+
 async function parseApiError(response, provider) {
   let errorMsg = `${response.status} ${response.statusText}`;
   try {
@@ -84,11 +92,11 @@ async function handleTokenRetry(response, payload, url, headers) {
 }
 
 async function generateFilename(providerConfig, fileMeta, extractedContent, appSettings) {
-  let prompt = appSettings?.customPrompt || `Based on the following file content, suggest a concise, descriptive filename (without extension, using lowercase and underscores). Only output the filename, nothing else.`;
+  let prompt = appSettings?.customPrompt || DEFAULT_CUSTOM_PROMPT;
 
   if (appSettings?.suggestFolders) {
     let baseFolder = extractedContent?.type === 'image' ? 'images' : 'documents';
-    prompt = (appSettings?.customFolderPrompt || `Based on the following file content, suggest a concise, descriptive relative folder path and filename (without extension, using lowercase and underscores) to categorize the file. VERY IMPORTANT: Separate folders with a forward slash (/) and MUST start with '{baseFolder}/'. e.g., '{baseFolder}/category/sub_category/descriptive_name'. Only output the relative path and filename, nothing else.`).replace(/{baseFolder}/g, baseFolder);
+    prompt = (appSettings?.customFolderPrompt || DEFAULT_FOLDER_PROMPT).replace(/{baseFolder}/g, baseFolder);
   }
 
   let cleanOriginalName = '';
@@ -122,7 +130,7 @@ async function generateFilename(providerConfig, fileMeta, extractedContent, appS
       } else if (providerConfig.provider === 'openrouter') {
         result = await callOpenRouter(providerConfig, prompt, extractedContent);
       } else {
-        result = { proposedName: `${fileMeta.name.split('.')[0]}_renamed_by_ai`, aiLog: null };
+        throw new Error(`Unknown provider: ${providerConfig.provider}`);
       }
       
       break; // Success
@@ -175,15 +183,8 @@ async function fetchModels(config) {
       return { success: true, models: data.data.map(m => m.id) };
     }
     
-    if (['lmstudio', 'llamacpp', 'jan', 'gpt4all'].includes(config.provider)) {
-      let baseUrl = config.apiUrl;
-      if (!baseUrl) {
-        if (config.provider === 'llamacpp') baseUrl = 'http://localhost:8080/v1';
-        else if (config.provider === 'jan') baseUrl = 'http://localhost:1337/v1';
-        else if (config.provider === 'gpt4all') baseUrl = 'http://localhost:4891/v1';
-        else baseUrl = 'http://localhost:1234/v1';
-      }
-      if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    if (LOCAL_OPENAI_COMPAT.has(config.provider)) {
+      const baseUrl = resolveLocalBaseUrl(config);
       
       const res = await fetch(`${baseUrl}/models`);
       if (!res.ok) throw new Error(`Could not connect to Local Server`);
@@ -211,7 +212,7 @@ async function fetchModels(config) {
     }
 
     if (config.provider === 'ollama') {
-      const url = `${config.apiUrl || 'http://localhost:11434'}/api/tags`;
+      const url = `${resolveLocalBaseUrl(config) || defaultApiUrlForProvider('ollama')}/api/tags`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Could not connect to Ollama');
       const data = await res.json();
@@ -235,7 +236,9 @@ async function fetchModels(config) {
     }
 
     if (config.provider === 'gemini' || config.provider === 'aistudio') {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: { 'x-goog-api-key': config.apiKey, 'Accept': 'application/json' }
+      });
       if (!res.ok) throw new Error('Invalid API Key');
       const data = await res.json();
       return { success: true, models: data.models.map(m => m.name.replace('models/', '')) };
@@ -248,7 +251,7 @@ async function fetchModels(config) {
 }
 
 async function callOllama(config, prompt, content) {
-  const url = `${config.apiUrl || 'http://localhost:11434'}/api/generate`;
+  const url = `${resolveLocalBaseUrl(config) || defaultApiUrlForProvider('ollama')}/api/generate`;
   
   let payload = { model: config.model || 'llama3', stream: false };
   
@@ -342,15 +345,7 @@ async function callOpenAI(config, prompt, content) {
 }
 
 async function callLMStudio(config, prompt, content) {
-  let baseUrl = config.apiUrl;
-  if (!baseUrl) {
-    if (config.provider === 'llamacpp') baseUrl = 'http://localhost:8080/v1';
-    else if (config.provider === 'jan') baseUrl = 'http://localhost:1337/v1';
-    else if (config.provider === 'gpt4all') baseUrl = 'http://localhost:4891/v1';
-    else baseUrl = 'http://localhost:1234/v1';
-  }
-  if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-  
+  const baseUrl = resolveLocalBaseUrl(config);
   const url = `${baseUrl}/chat/completions`;
   
   let messages = [];
@@ -508,7 +503,7 @@ async function callGemini(config, prompt, content) {
   if (!model) {
     model = content.type === 'image' ? 'gemini-1.5-flash' : 'gemini-1.5-flash';
   }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   
   let parts = [];
   if (content.type === 'text') {
@@ -525,7 +520,10 @@ async function callGemini(config, prompt, content) {
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': config.apiKey,
+      },
       body: JSON.stringify(payload)
     });
     
